@@ -247,9 +247,17 @@ def get_wheel_url():
     # _, cuda_version_raw = get_cuda_bare_metal_version(CUDA_HOME)
     torch_cuda_version = parse(torch.version.cuda)
     torch_version_raw = parse(torch.__version__)
-    # For CUDA 11, we only compile for CUDA 11.8, and for CUDA 12 we only compile for CUDA 12.2
+    # For CUDA 11, we only compile for CUDA 11.8, and for CUDA 12 we compile for CUDA 12.2 or 12.5
     # to save CI time. Minor versions should be compatible.
-    torch_cuda_version = parse("11.8") if torch_cuda_version.major == 11 else parse("12.2")
+    # CUDA 12.5 is used by Google Colab A100 environments
+    if torch_cuda_version.major == 11:
+        torch_cuda_version = parse("11.8")
+    elif torch_cuda_version.major == 12:
+        # Use 12.5 for CUDA 12.5+, otherwise use 12.2
+        if torch_cuda_version >= parse("12.5"):
+            torch_cuda_version = parse("12.5")
+        else:
+            torch_cuda_version = parse("12.2")
     python_version = f"cp{sys.version_info.major}{sys.version_info.minor}"
     platform_name = get_platform()
     flash_version = get_package_version()
