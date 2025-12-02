@@ -247,14 +247,17 @@ def get_wheel_url():
     # _, cuda_version_raw = get_cuda_bare_metal_version(CUDA_HOME)
     torch_cuda_version = parse(torch.version.cuda)
     torch_version_raw = parse(torch.__version__)
-    # For CUDA 11, we only compile for CUDA 11.8, and for CUDA 12 we compile for CUDA 12.2 or 12.5
+    # For CUDA 11, we only compile for CUDA 11.8, and for CUDA 12 we compile for CUDA 12.2, 12.5, or 12.6
     # to save CI time. Minor versions should be compatible.
     # CUDA 12.5 is used by Google Colab A100 environments
+    # CUDA 12.6 is used by Google Colab A100 environments with PyTorch 2.9+
     if torch_cuda_version.major == 11:
         torch_cuda_version = parse("11.8")
     elif torch_cuda_version.major == 12:
-        # Use 12.5 for CUDA 12.5+, otherwise use 12.2
-        if torch_cuda_version >= parse("12.5"):
+        # Use 12.6 for CUDA 12.6+, 12.5 for CUDA 12.5+, otherwise use 12.2
+        if torch_cuda_version >= parse("12.6"):
+            torch_cuda_version = parse("12.6")
+        elif torch_cuda_version >= parse("12.5"):
             torch_cuda_version = parse("12.5")
         else:
             torch_cuda_version = parse("12.2")
