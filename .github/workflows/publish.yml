@@ -120,30 +120,16 @@ jobs:
         with:
           swap-size-gb: 10
 
-      - name: Install CUDA ${{ matrix.cuda-version }}
-        if: ${{ matrix.cuda-version != 'cpu' && matrix.cuda-version != '12.5.0' && matrix.cuda-version != '12.6.0' }}
-        uses: Jimver/cuda-toolkit@v0.2.11
-        id: cuda-toolkit
-        with:
-          cuda: ${{ matrix.cuda-version }}
-          linux-local-args: '["--toolkit"]'
-          # default method is "local", and we're hitting some error with caching for CUDA 11.8 and 12.1
-          # method: ${{ (matrix.cuda-version == '11.8.0' || matrix.cuda-version == '12.1.0') && 'network' || 'local' }}
-          method: "network"
-          # We need the cuda libraries (e.g. cuSparse, cuSolver) for compiling PyTorch extensions,
-          # not just nvcc
-          # sub-packages: '["nvcc"]'
-
-      - name: Install CUDA 12.5.0 or 12.6.0 manually
-        if: ${{ matrix.cuda-version == '12.5.0' || matrix.cuda-version == '12.6.0' }}
+      - name: Install CUDA ${{ matrix.cuda-version }} manually
+        if: ${{ matrix.cuda-version != 'cpu' }}
         run: |
-          # CUDA 12.5.0 and 12.6.0 are not available in the cuda-toolkit action
-          # Install manually using NVIDIA's official repository
+          # CUDA toolkit action doesn't work with Ubuntu 24.04 (ubuntu-latest)
+          # Install manually using NVIDIA's official Ubuntu 22.04 repository (compatible)
           CUDA_VERSION=${{ matrix.cuda-version }}
           CUDA_MAJOR=$(echo $CUDA_VERSION | cut -d. -f1)
           CUDA_MINOR=$(echo $CUDA_VERSION | cut -d. -f2)
           
-          # Download and install CUDA keyring
+          # Download and install CUDA keyring (use Ubuntu 22.04 repo, compatible with 24.04)
           wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
           sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update
@@ -166,7 +152,12 @@ jobs:
           # e.g. we can have system CUDA version being 11.7 but if torch==1.12 then we need to download the wheel from cu116
           # This code is ugly, maybe there's a better way to do this.
           export TORCH_CUDA_VERSION=$(python -c "import os; minv = {'1.12': 113, '1.13': 116, '2.0': 117, '2.1': 118, '2.2': 118, '2.9': 118}[os.environ['MATRIX_TORCH_VERSION']]; maxv = {'1.12': 116, '1.13': 117, '2.0': 118, '2.1': 121, '2.2': 121, '2.9': 126}[os.environ['MATRIX_TORCH_VERSION']]; cuda_ver = int(os.environ['MATRIX_CUDA_VERSION']); torch_cuda = max(min(cuda_ver, maxv), minv); print(torch_cuda if torch_cuda not in [125, 126] else (121 if torch_cuda == 125 else 126))")
-          if [[ ${{ matrix.torch-version }} == *"dev"* ]]; then
+          # PyTorch 2.9.0 may only be available in nightly builds, try nightly first for 2.9.0
+          if [[ ${{ matrix.torch-version }} == "2.9.0" ]]; then
+            # Try nightly builds first for PyTorch 2.9.0 (supports cu126)
+            pip install --no-cache-dir --pre torch==${{ matrix.torch-version }} --index-url https://download.pytorch.org/whl/nightly/cu${TORCH_CUDA_VERSION} || \
+            pip install --no-cache-dir torch==${{ matrix.torch-version }} --index-url https://download.pytorch.org/whl/cu${TORCH_CUDA_VERSION}
+          elif [[ ${{ matrix.torch-version }} == *"dev"* ]]; then
             pip install --no-cache-dir --pre torch==${{ matrix.torch-version }} --index-url https://download.pytorch.org/whl/nightly/cu${TORCH_CUDA_VERSION}
           else
             pip install --no-cache-dir torch==${{ matrix.torch-version }} --index-url https://download.pytorch.org/whl/cu${TORCH_CUDA_VERSION}
