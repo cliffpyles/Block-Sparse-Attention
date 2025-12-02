@@ -45,7 +45,7 @@ jobs:
         # Using ubuntu-latest (currently 22.04). ubuntu-20.04 is no longer available on GitHub Actions.
         # Ideally we'd use the manylinux docker image, but I haven't figured out how to install CUDA on manylinux.
         os: [ubuntu-latest]
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
         torch-version: ["1.12.1", "1.13.1", "2.0.1", "2.1.1", "2.2.0", "2.9.0"]
         cuda-version: ["11.8.0", "12.2.0", "12.5.0", "12.6.0"]
         # We need separate wheels that either uses C++11 ABI (-D_GLIBCXX_USE_CXX11_ABI) or not.
@@ -64,15 +64,7 @@ jobs:
             python-version: "3.12"
           - torch-version: "2.0.1"
             python-version: "3.12"
-          # Pytorch >= 2.0 only supports Python >= 3.8
-          - torch-version: "2.0.1"
-            python-version: "3.7"
-          - torch-version: "2.1.1"
-            python-version: "3.7"
-          - torch-version: "2.2.0"
-            python-version: "3.7"
-          - torch-version: "2.9.0"
-            python-version: "3.7"
+          # Python 3.7 is not available on Ubuntu 24.04 (ubuntu-latest)
           # Pytorch <= 2.0 only supports CUDA <= 11.8
           - torch-version: "1.12.1"
             cuda-version: "12.2.0"
@@ -129,7 +121,7 @@ jobs:
           swap-size-gb: 10
 
       - name: Install CUDA ${{ matrix.cuda-version }}
-        if: ${{ matrix.cuda-version != 'cpu' }}
+        if: ${{ matrix.cuda-version != 'cpu' && matrix.cuda-version != '12.5.0' && matrix.cuda-version != '12.6.0' }}
         uses: Jimver/cuda-toolkit@v0.2.11
         id: cuda-toolkit
         with:
@@ -141,6 +133,28 @@ jobs:
           # We need the cuda libraries (e.g. cuSparse, cuSolver) for compiling PyTorch extensions,
           # not just nvcc
           # sub-packages: '["nvcc"]'
+
+      - name: Install CUDA 12.5.0 or 12.6.0 manually
+        if: ${{ matrix.cuda-version == '12.5.0' || matrix.cuda-version == '12.6.0' }}
+        run: |
+          # CUDA 12.5.0 and 12.6.0 are not available in the cuda-toolkit action
+          # Install manually using NVIDIA's official repository
+          CUDA_VERSION=${{ matrix.cuda-version }}
+          CUDA_MAJOR=$(echo $CUDA_VERSION | cut -d. -f1)
+          CUDA_MINOR=$(echo $CUDA_VERSION | cut -d. -f2)
+          
+          # Download and install CUDA keyring
+          wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
+          sudo apt-get update
+          
+          # Install CUDA toolkit
+          sudo apt-get -y install cuda-toolkit-${CUDA_MAJOR}-${CUDA_MINOR}
+          
+          # Set environment variables
+          echo "CUDA_HOME=/usr/local/cuda-${CUDA_MAJOR}.${CUDA_MINOR}" >> $GITHUB_ENV
+          echo "/usr/local/cuda-${CUDA_MAJOR}.${CUDA_MINOR}/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-${CUDA_MAJOR}.${CUDA_MINOR}/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
       - name: Install PyTorch ${{ matrix.torch-version }}+cu${{ matrix.cuda-version }}
         run: |
