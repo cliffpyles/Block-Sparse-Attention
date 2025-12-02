@@ -94,8 +94,11 @@ This saves time since you don't need to rebuild every time!
 
 ## Notes
 
-- The build process takes approximately 5-10 minutes on Colab A100
+- **Build Time**: The build process typically takes **15-25 minutes** on Colab A100, depending on server load:
+  - The project compiles **60 CUDA source files** for **2 compute capabilities** (sm_80 and sm_90), resulting in **120 effective compilations**
+  - Uses the CUTLASS template library which adds significant compilation overhead
+  - First-time builds may take longer due to CUTLASS submodule download (~1-2 minutes)
+  - Subsequent builds (with cached dependencies) may be slightly faster
 - The wheel file size is typically 50-100 MB
 - Built wheels are specific to the Python version and CUDA version used during build
 - Wheels built on Colab A100 should work on other A100 environments with matching Python/CUDA versions
-
